@@ -16,7 +16,7 @@ from aioquic.quic.logger import QuicFileLogger
 from aioquic.tls import SessionTicket
 from dnslib.dns import DNSRecord
 
-from dnslib import RR, QTYPE, TXT
+from dnslib import DNSHeader, RR, QTYPE, TXT, A
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
@@ -60,9 +60,19 @@ class DnsServerProtocol(QuicConnectionProtocol):
             encrypted_token = PROXY_CIPHER.encrypt(signed_jwt.encode())
 
             # perform lookup and serialize answer
-            data = query.send(args.resolver, 53)
+            #data = query.send(args.resolver, 53)
             #parse answer
-            response = DNSRecord.parse(data)
+            #response = DNSRecord.parse(data)
+
+            response = DNSRecord(DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q)
+            
+            response.add_answer(RR(
+                rname=query.q.qname,
+                rtype=QTYPE.A,
+                rclass=1,
+                ttl=10,
+                rdata=A("192.168.1.2"),  # IP du proxy maquiche
+            ))
 
             # create response with additional data
             response.ar.append(RR(
