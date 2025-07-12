@@ -7,6 +7,7 @@ from typing import Dict, Optional
 import time
 import jwt
 import json
+import socket
 
 from aioquic.asyncio import QuicConnectionProtocol, serve
 from aioquic.quic.configuration import QuicConfiguration
@@ -15,12 +16,12 @@ from aioquic.quic.logger import QuicFileLogger
 from aioquic.tls import SessionTicket
 from dnslib.dns import DNSRecord
 
-from dnslib import DNSHeader, RR, QTYPE, A, TXT
+from dnslib import RR, QTYPE, TXT
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
 with open("/home/user/resolver_private.pem", "rb") as f:
-    RESOLVER_PRIVATE_KEY = f.read()
+    RESOLVER_PRIVATE_KEY = RSA.import_key(f.read())
 with open("/home/user/proxy_public.pem", "rb") as f:
     PROXY_PUBLIC_KEY = RSA.import_key(f.read())
     PROXY_CIPHER = PKCS1_OAEP.new(PROXY_PUBLIC_KEY) #initialisation chifreur RSQ qvec pqdding
@@ -31,7 +32,7 @@ class DnsServerProtocol(QuicConnectionProtocol):
             # parse query
             length = struct.unpack("!H", bytes(event.data[:2]))[0]
             query = DNSRecord.parse(event.data[2 : 2 + length])
-
+            # if client provide add records, retrrieve them
             ar = query.ar
             # drop records if further interaction with unmodified resolvers
             query.ar = []
@@ -41,8 +42,9 @@ class DnsServerProtocol(QuicConnectionProtocol):
             print("Questions", query.questions)
             print("Additional Records", ar)
 
-            qname = str(query.q.qname).rstrip(".")
-            client_ip = self._quic._network_path.addr[0] 
+            # create token
+            qname = str(query.q.qname)
+            client_ip = self._quic._network_paths[0].addr[0]
             resolver_cid = self._quic.host_cid.hex()
             timestamp = int(time.time())
 
@@ -53,23 +55,29 @@ class DnsServerProtocol(QuicConnectionProtocol):
                 "service_name": qname
             }
 
-            signed_jwt = jwt.encode(payload, RESOLVER_PRIVATE_KEY, algorithm="RS256")
+            # sign and encrypt token
+            signed_jwt = jwt.encode(payload, RESOLVER_PRIVATE_KEY.export_key(), algorithm="RS256")
             encrypted_token = PROXY_CIPHER.encrypt(signed_jwt.encode())
 
             # perform lookup and serialize answer
-            # data = query.send(args.resolver, 53)
+            data = query.send(args.resolver, 53)
+            #parse answer
+            response = DNSRecord.parse(data)
 
-            response = DNSRecord(
-                DNSHeader(id=query.header.id, qr=1, aa=1, ra=1),
-                q =query.q,
-                a=RR(qname, QTYPE.A,rdata=A("192.168.1.2"),ttl=60),
-                ar=[RR(f"auth.{qname}", QTYPE.TXT,rdata=TXT(encrypted_token.hex()),ttl=60)],
-            )
+            # create response with additional data
+            response.ar.append(RR(
+                rname="auth",
+                rtype=QTYPE.TXT,
+                rclass=1,
+                ttl=10,
+                rdata=TXT(encrypted_token.hex()),
+            ))
 
-            packed = struct.pack("!H",len(response.pack())) + repsonse.pack()
+            data = response.pack()
+            data = struct.pack("!H", len(data)) + data
 
             # send answer
-            self._quic.send_stream_data(event.stream_id, packed, end_stream=True)
+            self._quic.send_stream_data(event.stream_id, data, end_stream=True)
 
 
 class SessionTicketStore:
