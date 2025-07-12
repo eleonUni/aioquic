@@ -97,7 +97,7 @@ class DnsServerProtocol(QuicConnectionProtocol):
                 rtype=QTYPE.TXT,
                 rclass=1,
                 ttl=10,
-                rdata=TXT(*chunks),
+                rdata=TXT(chunks),
             ))
 
             data = response.pack()
