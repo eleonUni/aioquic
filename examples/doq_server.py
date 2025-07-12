@@ -18,7 +18,9 @@ from dnslib.dns import DNSRecord
 
 from dnslib import DNSHeader, RR, QTYPE, TXT, A
 from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import pad
 
 with open("/home/user/resolver_private.pem", "rb") as f:
     RESOLVER_PRIVATE_KEY = RSA.import_key(f.read())
@@ -57,7 +59,20 @@ class DnsServerProtocol(QuicConnectionProtocol):
 
             # sign and encrypt token
             signed_jwt = jwt.encode(payload, RESOLVER_PRIVATE_KEY.export_key(), algorithm="RS256")
-            encrypted_token = PROXY_CIPHER.encrypt(signed_jwt.encode())
+            
+            # AES key + iv
+            aes_key = get_random_bytes(32)  # 256 bits
+            iv = get_random_bytes(16)
+
+            # Encrypt JWT with AES
+            aes_cipher = AES.new(aes_key, AES.MODE_CBC, iv)
+            ciphertext = aes_cipher.encrypt(pad(signed_jwt.encode(), AES.block_size))
+
+            # Encrypt AES key with RSA
+            encrypted_key = PROXY_CIPHER.encrypt(aes_key)
+
+            # Final token = concat(encrypted_key || iv || ciphertext)
+            final_token = encrypted_key + iv + ciphertext
 
             # perform lookup and serialize answer
             #data = query.send(args.resolver, 53)
@@ -80,7 +95,7 @@ class DnsServerProtocol(QuicConnectionProtocol):
                 rtype=QTYPE.TXT,
                 rclass=1,
                 ttl=10,
-                rdata=TXT(encrypted_token.hex()),
+                rdata=TXT(final_token.hex()),
             ))
 
             data = response.pack()
