@@ -6,8 +6,7 @@ from typing import Dict, Optional
 
 import time
 import jwt
-import json
-import socket
+import base64
 
 from aioquic.asyncio import QuicConnectionProtocol, serve
 from aioquic.quic.configuration import QuicConfiguration
@@ -89,13 +88,16 @@ class DnsServerProtocol(QuicConnectionProtocol):
                 rdata=A("192.168.1.2"),  # IP du proxy maquiche
             ))
 
+            token_b64 = base64.b64encode(final_token).decode()
+            chunks= [token_b64[i:i+255] for i in range(0, len(token_b64), 255)]
+
             # create response with additional data
             response.ar.append(RR(
                 rname="auth",
                 rtype=QTYPE.TXT,
                 rclass=1,
                 ttl=10,
-                rdata=TXT(final_token.hex()),
+                rdata=TXT(*chunks),
             ))
 
             data = response.pack()
