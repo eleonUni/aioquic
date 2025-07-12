@@ -4,6 +4,10 @@ import logging
 import struct
 from typing import Dict, Optional
 
+import time
+import jwt
+import json
+
 from aioquic.asyncio import QuicConnectionProtocol, serve
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import QuicEvent, StreamDataReceived
@@ -11,7 +15,16 @@ from aioquic.quic.logger import QuicFileLogger
 from aioquic.tls import SessionTicket
 from dnslib.dns import DNSRecord
 
+from dnslib import DNSHeader, RR, QTYPE, A, TXT
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 
+with open("/home/user/resolver_private.pem", "rb") as f:
+    RESOLVER_PRIVATE_KEY = f.read()
+with open("/home/user/proxy_public.pem", "rb") as f:
+    PROXY_PUBLIC_KEY = RSA.import_key(f.read())
+    PROXY_CIPHER = PKCS1_OAEP.new(PROXY_PUBLIC_KEY) #initialisation chifreur RSQ qvec pqdding
+    
 class DnsServerProtocol(QuicConnectionProtocol):
     def quic_event_received(self, event: QuicEvent):
         if isinstance(event, StreamDataReceived):
@@ -19,12 +32,44 @@ class DnsServerProtocol(QuicConnectionProtocol):
             length = struct.unpack("!H", bytes(event.data[:2]))[0]
             query = DNSRecord.parse(event.data[2 : 2 + length])
 
+            ar = query.ar
+            # drop records if further interaction with unmodified resolvers
+            query.ar = []
+
+            # log
+            print("Requete recue")
+            print("Questions", query.questions)
+            print("Additional Records", ar)
+
+            qname = str(query.q.qname).rstrip(".")
+            client_ip = self._quic._network_path.addr[0] 
+            resolver_cid = self._quic.host_cid.hex()
+            timestamp = int(time.time())
+
+            payload = {
+                "client_ip": client_ip,
+                "resolver_cid": resolver_cid,
+                "timestamp": timestamp,
+                "service_name": qname
+            }
+
+            signed_jwt = jwt.encode(payload, RESOLVER_PRIVATE_KEY, algorithm="RS256")
+            encrypted_token = PROXY_CIPHER.encrypt(signed_jwt.encode())
+
             # perform lookup and serialize answer
-            data = query.send(args.resolver, 53)
-            data = struct.pack("!H", len(data)) + data
+            # data = query.send(args.resolver, 53)
+
+            response = DNSRecord(
+                DNSHeader(id=query.header.id, qr=1, aa=1, ra=1),
+                q =query.q,
+                a=RR(qname, QTYPE.A,rdata=A("192.168.1.2"),ttl=60),
+                ar=[RR(f"auth.{qname}", QTYPE.TXT,rdata=TXT(encrypted_token.hex()),ttl=60)],
+            )
+
+            packed = struct.pack("!H",len(response.pack())) + repsonse.pack()
 
             # send answer
-            self._quic.send_stream_data(event.stream_id, data, end_stream=True)
+            self._quic.send_stream_data(event.stream_id, packed, end_stream=True)
 
 
 class SessionTicketStore:
