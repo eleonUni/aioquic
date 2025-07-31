@@ -53,8 +53,7 @@ class DnsServerProtocol(QuicConnectionProtocol):
                 "client_ip": client_ip,
                 "resolver_cid": resolver_cid,
                 "timestamp": timestamp,
-                "service_name": qname,
-                "exp": timestamp + 60
+                "service_name": qname
             }
 
             # sign and encrypt token
