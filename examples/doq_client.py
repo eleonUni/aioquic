@@ -43,7 +43,9 @@ class DnsClientProtocol(QuicConnectionProtocol):
         if self._ack_waiter is not None:
             if isinstance(event, StreamDataReceived):
                 # parse answer
+                print(f"Raw event data (len={len(event.data)}):", event.data.hex())
                 length = struct.unpack("!H", bytes(event.data[:2]))[0]
+                print(f"Interpreted DNS length: {length}")
                 answer = DNSRecord.parse(event.data[2 : 2 + length])
 
                 # return answer
