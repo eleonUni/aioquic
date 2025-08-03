@@ -31,7 +31,9 @@ class DnsServerProtocol(QuicConnectionProtocol):
     def quic_event_received(self, event: QuicEvent):
         if isinstance(event, StreamDataReceived):
             # parse query
+            print(f"Raw event data (len={len(event.data)}):", event.data.hex())
             length = struct.unpack("!H", bytes(event.data[:2]))[0]
+            print(f"Interpreted DNS length: {length}")
             query = DNSRecord.parse(event.data[2 : 2 + length])
             # if client provide add records, retrrieve them
             ar = query.ar
