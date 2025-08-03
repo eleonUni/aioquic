@@ -92,6 +92,17 @@ class DnsServerProtocol(QuicConnectionProtocol):
 
             token_b64 = base64.b64encode(final_token).decode()
             chunks= [token_b64[i:i+255] for i in range(0, len(token_b64), 255)]
+            
+            print("payload", payload)
+            print("jwt", signed_jwt)
+            print("AES key:", aes_key.hex())
+            print("IV:", iv.hex())
+            print("Final token (raw):", final_token.hex())
+            print("encoded token", token_b64)
+            
+            print(f"nombre de chunks TXT : {len(chunks)}")
+            for i, chunk in enumerate(chunks):
+                print(f"Chunk {i} : {len(chunk)} caractères")
 
             # create response with additional data
             response.ar.append(RR(
