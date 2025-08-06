@@ -20,12 +20,13 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad
+from Crypto.Hash import SHA256
 
 with open("/home/user/resolver_private.pem", "rb") as f:
     RESOLVER_PRIVATE_KEY = RSA.import_key(f.read())
 with open("/home/user/proxy_public.pem", "rb") as f:
     PROXY_PUBLIC_KEY = RSA.import_key(f.read())
-    PROXY_CIPHER = PKCS1_OAEP.new(PROXY_PUBLIC_KEY) #initialisation chifreur RSQ qvec pqdding
+    PROXY_CIPHER = PKCS1_OAEP.new(PROXY_PUBLIC_KEY, hashAlgo=SHA256)) #initialisation chifreur RSQ qvec pqdding
     
 class DnsServerProtocol(QuicConnectionProtocol):
     def quic_event_received(self, event: QuicEvent):
