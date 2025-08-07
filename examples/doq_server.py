@@ -21,9 +21,12 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad
 from Crypto.Hash import SHA256
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.backends import default_backend
 
-with open("/home/user/resolver_private.pem", "rb") as f:
-    RESOLVER_PRIVATE_KEY = RSA.import_key(f.read())
+
+with open("../resolver_private.pem", "rb") as f:
+    RESOLVER_PRIVATE_KEY = load_pem_private_key(f.read(), password=None, backend=default_backend())
 with open("/home/user/proxy_public.pem", "rb") as f:
     PROXY_PUBLIC_KEY = RSA.import_key(f.read())
     PROXY_CIPHER = PKCS1_OAEP.new(PROXY_PUBLIC_KEY, hashAlgo=SHA256) #initialisation chifreur RSQ qvec pqdding
@@ -68,7 +71,7 @@ class DnsServerProtocol(QuicConnectionProtocol):
             }
 
             # sign and encrypt token
-            signed_jwt = jwt.encode(payload, RESOLVER_PRIVATE_KEY.export_key(), algorithm="RS256")
+            signed_jwt = jwt.encode(payload, RESOLVER_PRIVATE_KEY, algorithm="EdDSA")
             
             # AES key + iv
             aes_key = get_random_bytes(32)  # 256 bits
@@ -83,11 +86,6 @@ class DnsServerProtocol(QuicConnectionProtocol):
 
             # Final token = concat(encrypted_key || iv || ciphertext)
             final_token = encrypted_key + iv + ciphertext
-
-            # perform lookup and serialize answer
-            #data = query.send(args.resolver, 53)
-            #parse answer
-            #response = DNSRecord.parse(data)
 
             response = DNSRecord(DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q)
             
