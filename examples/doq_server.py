@@ -103,8 +103,6 @@ class DnsServerProtocol(QuicConnectionProtocol):
             print("payload", payload)
             print("jwt", signed_jwt)
             print("AES key:", aes_key.hex())
-            print("ciphertext", ciphertext)
-            print("encrypted AES key:", encrypted_key)
             print("IV:", iv.hex())
             print("Final token (raw):", final_token.hex())
             print("encoded token", token_b64)
