@@ -63,7 +63,7 @@ class DnsServerProtocol(QuicConnectionProtocol):
             payload = {
                 "client_ip": client_ip,
                 "resolver_cid": resolver_cid,
-                "service_name": qname
+                "service_name": qname,
                 "exp": exp
             }
 
