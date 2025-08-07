@@ -58,12 +58,11 @@ class DnsServerProtocol(QuicConnectionProtocol):
             qname = str(query.q.qname)
             client_ip = self._quic._network_paths[0].addr[0]
             resolver_cid = self._quic.host_cid.hex()
-            timestamp = int(time.time())
-
+            exp = int(time.time()) + 60
+    
             payload = {
                 "client_ip": client_ip,
                 "resolver_cid": resolver_cid,
-                "timestamp": timestamp,
                 "service_name": qname
                 "exp": exp
             }
