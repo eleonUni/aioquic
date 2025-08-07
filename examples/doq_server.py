@@ -65,6 +65,7 @@ class DnsServerProtocol(QuicConnectionProtocol):
                 "resolver_cid": resolver_cid,
                 "timestamp": timestamp,
                 "service_name": qname
+                "exp": exp
             }
 
             # sign and encrypt token
