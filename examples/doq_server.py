@@ -25,7 +25,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.hazmat.backends import default_backend
 
 
-with open("../resolver_private.pem", "rb") as f:
+with open("/home/user/aioquic/resolver_private.pem", "rb") as f:
     RESOLVER_PRIVATE_KEY = load_pem_private_key(f.read(), password=None, backend=default_backend())
 with open("/home/user/proxy_public.pem", "rb") as f:
     PROXY_PUBLIC_KEY = RSA.import_key(f.read())
