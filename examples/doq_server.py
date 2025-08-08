@@ -75,17 +75,17 @@ class DnsServerProtocol(QuicConnectionProtocol):
             
             # AES key + iv
             aes_key = get_random_bytes(32)  # 256 bits
-            iv = get_random_bytes(16)
+            nonce = get_random_bytes(12) 
 
             # Encrypt JWT with AES
-            aes_cipher = AES.new(aes_key, AES.MODE_CBC, iv)
-            ciphertext = aes_cipher.encrypt(pad(signed_jwt.encode(), AES.block_size))
+            aes_cipher = AES.new(aes_key, AES.MODE_GCM, nonce=nonce)
+            ciphertext, tag = aes_cipher.encrypt_and_digest(signed_jwt.encode())
 
             # Encrypt AES key with RSA
             encrypted_key = PROXY_CIPHER.encrypt(aes_key)
 
             # Final token = concat(encrypted_key || iv || ciphertext)
-            final_token = encrypted_key + iv + ciphertext
+            final_token = encrypted_key + nonce + tag + ciphertext
 
             response = DNSRecord(DNSHeader(id=query.header.id, qr=1, aa=1, ra=1), q=query.q)
             
